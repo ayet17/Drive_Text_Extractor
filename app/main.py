@@ -1,12 +1,15 @@
 """Main FastAPI application entry point.
 
-Exposes health check, API routes, and serves the static single-page interface.
+Exposes health check, Drive inspection routes, and serves the static interface.
 """
 
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+from app.drive import DriveAccessError, InvalidDriveURLError, list_folder_files
+from app.schemas import ErrorResponse, FileListResponse, FolderRequest
 
 # Absolute path to static assets directory
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -31,3 +34,23 @@ def health_check() -> dict[str, str]:
 def serve_index() -> FileResponse:
     """Serve the root single-page HTML interface."""
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.post(
+    "/api/files",
+    response_model=FileListResponse,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse, "description": "Invalid link format"},
+        status.HTTP_502_BAD_GATEWAY: {"model": ErrorResponse, "description": "Drive folder unreachable or private"},
+    },
+    summary="List files from a public Google Drive folder",
+)
+def list_files_endpoint(request: FolderRequest) -> FileListResponse:
+    """Inspect a public Google Drive folder URL and return detected PDFs and images."""
+    try:
+        files = list_folder_files(request.url)
+        return FileListResponse(files=files, total_count=len(files))
+    except InvalidDriveURLError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except DriveAccessError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
