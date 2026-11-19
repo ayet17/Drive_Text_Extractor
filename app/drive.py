@@ -1,7 +1,8 @@
 """Google Drive interaction module.
 
 Validates public folder links, queries folder contents using gdown,
-and filters items to supported document and image formats.
+filters items to supported document and image formats, and downloads
+individual files into temporary storage.
 """
 
 from pathlib import Path
@@ -23,8 +24,9 @@ FOLDER_URL_PATTERN = re.compile(
 )
 BARE_FOLDER_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{15,45}$")
 
-# Maximum number of files processed per folder request to protect resource usage
+# Guardrails to protect server resources
 MAX_FOLDER_FILES: int = 50
+MAX_FILE_SIZE_BYTES: int = 25 * 1024 * 1024  # 25 MB maximum download size
 
 
 class DriveError(Exception):
@@ -36,7 +38,11 @@ class InvalidDriveURLError(DriveError):
 
 
 class DriveAccessError(DriveError):
-    """Raised when a folder cannot be accessed (private, deleted, or network failure)."""
+    """Raised when a folder or file cannot be accessed (private, deleted, or network failure)."""
+
+
+class FileTooLargeError(DriveError):
+    """Raised when a downloaded file exceeds the configured size limit."""
 
 
 def extract_folder_id(url_or_id: str) -> str:
@@ -88,7 +94,7 @@ def categorize_file(filename: str) -> Literal["pdf", "image"] | None:
 def list_folder_files(url_or_id: str, max_files: int = MAX_FOLDER_FILES) -> list[DriveFileItem]:
     """Retrieve metadata of supported PDF and image files from a public Drive folder.
 
-    Uses gdown with skip_download=True to inspect folder contents without downloading the payload.
+    Uses gdown with skip_download=True to inspect contents without fetching file bodies.
 
     Args:
         url_or_id: Public Google Drive folder link or ID.
@@ -104,7 +110,6 @@ def list_folder_files(url_or_id: str, max_files: int = MAX_FOLDER_FILES) -> list
     folder_id = extract_folder_id(url_or_id)
 
     try:
-        # skip_download=True inspects folder contents without downloading the payload
         items = gdown.download_folder(
             id=folder_id,
             skip_download=True,
@@ -135,8 +140,57 @@ def list_folder_files(url_or_id: str, max_files: int = MAX_FOLDER_FILES) -> list
                 )
             )
 
-        # Enforce maximum file limit guardrail
+        # Enforce maximum file count limit
         if len(filtered_files) >= max_files:
             break
 
     return filtered_files
+
+
+def download_drive_file(
+    file_id: str,
+    dest_path: Path,
+    max_bytes: int = MAX_FILE_SIZE_BYTES,
+) -> Path:
+    """Download a single file from Google Drive into a specified path.
+
+    Args:
+        file_id: Unique Google Drive file ID.
+        dest_path: Local filesystem path where the file will be saved.
+        max_bytes: Upper threshold in bytes for permissible file size.
+
+    Returns:
+        Path to the successfully downloaded file.
+
+    Raises:
+        DriveAccessError: If the download fails or the file is unreachable.
+        FileTooLargeError: If the file size exceeds max_bytes limit.
+    """
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        result = gdown.download(
+            id=file_id,
+            output=str(dest_path),
+            quiet=True,
+            use_cookies=False,
+        )
+    except Exception as exc:
+        raise DriveAccessError(f"Failed to download file from Google Drive: {exc}") from exc
+
+    if not result or not dest_path.is_file():
+        raise DriveAccessError(
+            f"Unable to download file '{dest_path.name}'. The file may be private, "
+            f"deleted, or rate-limited by Google Drive."
+        )
+
+    file_size = dest_path.stat().st_size
+    if file_size > max_bytes:
+        dest_path.unlink(missing_ok=True)
+        max_mb = max_bytes // (1024 * 1024)
+        raise FileTooLargeError(
+            f"File '{dest_path.name}' size ({file_size / (1024 * 1024):.1f} MB) exceeds "
+            f"the maximum allowed limit of {max_mb} MB."
+        )
+
+    return dest_path

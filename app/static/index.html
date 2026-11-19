@@ -7,16 +7,90 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
-    <h1>Drive Text Extractor</h1>
-    <p>Extract text and perform OCR on public Google Drive documents.</p>
-  </header>
+  <div class="container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <svg class="app-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        <div>
+          <h1>Drive Text Extractor</h1>
+          <p class="subtitle">Extract text from public Google Drive folders via digital parsing and OCR</p>
+        </div>
+      </div>
+    </header>
 
-  <main id="app-container">
-    <section class="card">
-      <p>Application skeleton loaded successfully.</p>
+    <!-- Error & Info Banners -->
+    <div id="alert-banner" class="alert hidden" role="alert">
+      <span id="alert-message"></span>
+      <button id="alert-dismiss" class="btn-icon" aria-label="Dismiss alert">&times;</button>
+    </div>
+
+    <!-- Input Form Card -->
+    <section class="card form-card">
+      <form id="drive-form">
+        <label for="drive-url" class="form-label">Public Google Drive Folder URL</label>
+        <div class="input-group">
+          <input
+            type="url"
+            id="drive-url"
+            name="driveUrl"
+            class="form-input"
+            placeholder="https://drive.google.com/drive/folders/..."
+            required
+            autocomplete="off"
+          />
+          <button type="submit" id="btn-fetch" class="btn btn-primary">
+            <span class="btn-text">Inspect Folder</span>
+            <span class="spinner hidden" id="fetch-spinner"></span>
+          </button>
+        </div>
+        <p class="form-hint">
+          Requires a public link (<em>"Anyone with the link can view"</em>). Supported formats: PDF, PNG, JPG, WEBP, TIFF.
+        </p>
+      </form>
     </section>
-  </main>
+
+    <!-- Files List Card -->
+    <section id="files-section" class="card hidden">
+      <div class="card-header">
+        <h2>Detected Files</h2>
+        <span id="file-counter" class="badge badge-info">0 files</span>
+      </div>
+      <div id="files-list" class="files-table-wrapper">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </section>
+
+    <!-- Extracted Content Preview Card -->
+    <section id="result-section" class="card hidden">
+      <div class="card-header">
+        <div>
+          <h2 id="result-filename">Extracted Text</h2>
+          <div class="meta-row">
+            <span id="badge-method" class="badge">Method</span>
+            <span id="meta-pages" class="meta-item">Pages: -</span>
+            <span id="meta-chars" class="meta-item">Characters: -</span>
+          </div>
+        </div>
+        <button id="btn-copy" class="btn btn-secondary">
+          <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span id="copy-btn-text">Copy Text</span>
+        </button>
+      </div>
+      <div class="preview-wrapper">
+        <pre><code id="extracted-text-content"></code></pre>
+      </div>
+    </section>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

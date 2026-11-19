@@ -1,15 +1,37 @@
 """Main FastAPI application entry point.
 
-Exposes health check, Drive inspection routes, and serves the static interface.
+Exposes health check, Drive folder inspection, and single-file text extraction routes,
+while serving the static single-page interface.
 """
 
 from pathlib import Path
+import tempfile
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.drive import DriveAccessError, InvalidDriveURLError, list_folder_files
-from app.schemas import ErrorResponse, FileListResponse, FolderRequest
+from app.drive import (
+    DriveAccessError,
+    FileTooLargeError,
+    InvalidDriveURLError,
+    download_drive_file,
+    list_folder_files,
+)
+from app.extractor import (
+    CorruptedFileError,
+    EncryptedFileError,
+    ExtractionError,
+    OCRError,
+    UnsupportedFileError,
+    extract_document_text,
+)
+from app.schemas import (
+    ErrorResponse,
+    ExtractRequest,
+    ExtractResponse,
+    FileListResponse,
+    FolderRequest,
+)
 
 # Absolute path to static assets directory
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -54,3 +76,83 @@ def list_files_endpoint(request: FolderRequest) -> FileListResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except DriveAccessError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
+@app.post(
+    "/api/extract",
+    response_model=ExtractResponse,
+    responses={
+        status.HTTP_400_BAD_REQUEST: {"model": ErrorResponse, "description": "Unsupported file format"},
+        status.HTTP_413_CONTENT_TOO_LARGE: {"model": ErrorResponse, "description": "File exceeds size limit"},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorResponse, "description": "Corrupt or encrypted document"},
+        status.HTTP_502_BAD_GATEWAY: {"model": ErrorResponse, "description": "Download failed from Google Drive"},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorResponse, "description": "OCR engine unavailable"},
+    },
+    summary="Download and extract text from a single Drive file",
+)
+def extract_file_endpoint(request: ExtractRequest) -> ExtractResponse:
+    """Download a single target file into a temporary directory, extract its text, and clean up.
+
+    Processes one file at a time using digital PDF parsing or OCR (images / scanned PDFs).
+    """
+    # Sanitize file name to avoid directory traversal exploits
+    safe_name = Path(request.file_name).name
+    if not safe_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A valid file name must be provided.",
+        )
+
+    # Isolated temporary workspace ensures no residual files or secrets persist on disk
+    with tempfile.TemporaryDirectory(prefix="drive_extractor_") as temp_dir:
+        target_path = Path(temp_dir) / safe_name
+
+        # 1. Download target file from Google Drive
+        try:
+            download_drive_file(request.file_id, target_path)
+        except FileTooLargeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail=str(exc),
+            ) from exc
+        except DriveAccessError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=str(exc),
+            ) from exc
+
+        # 2. Extract textual content
+        try:
+            text, method, page_count = extract_document_text(
+                target_path,
+                file_type=request.file_type,
+            )
+        except UnsupportedFileError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+        except (CorruptedFileError, EncryptedFileError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=str(exc),
+            ) from exc
+        except OCRError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=str(exc),
+            ) from exc
+        except ExtractionError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Extraction failure: {exc}",
+            ) from exc
+
+        return ExtractResponse(
+            file_id=request.file_id,
+            file_name=safe_name,
+            text=text,
+            method=method,
+            page_count=page_count,
+            character_count=len(text),
+        )

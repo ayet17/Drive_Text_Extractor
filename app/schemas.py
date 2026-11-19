@@ -42,6 +42,31 @@ class FileListResponse(BaseModel):
     )
 
 
+class ExtractRequest(BaseModel):
+    """Request payload to extract text from a single Google Drive file."""
+
+    file_id: str = Field(..., description="Google Drive file ID to download and process.")
+    file_name: str = Field(..., description="Original name of the target file.")
+    file_type: Literal["pdf", "image"] | None = Field(
+        default=None,
+        description="Pre-classified file type if known, or inferred from filename.",
+    )
+
+
+class ExtractResponse(BaseModel):
+    """Result of document text extraction and OCR."""
+
+    file_id: str = Field(..., description="Processed Google Drive file ID.")
+    file_name: str = Field(..., description="Name of the processed file.")
+    text: str = Field(..., description="Extracted textual content.")
+    method: Literal["digital", "ocr", "ocr_fallback"] = Field(
+        ...,
+        description="Extraction pipeline utilized: 'digital', 'ocr', or 'ocr_fallback'.",
+    )
+    page_count: int = Field(..., description="Total pages or images parsed.")
+    character_count: int = Field(..., description="Character count of extracted text.")
+
+
 class ErrorResponse(BaseModel):
     """Standardized error response payload."""
 
