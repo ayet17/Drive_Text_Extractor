@@ -83,7 +83,7 @@ A clean, lightweight Proof-of-Concept (POC) web application that inspects public
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
-   cd "dixpertia web page"
+   cd Drive_Text_Extractor
    ```
 
 2. **Create and activate a virtual environment**:
