@@ -1,10 +1,13 @@
 /**
  * Drive Text Extractor - Frontend Controller
  * Plain vanilla JavaScript interface handling Drive folder inspection,
- * per-file text extraction, and clipboard interactions.
+ * per-file text extraction, clipboard interactions, and a sidebar session history.
  */
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Storage key for session history
+  const STORAGE_KEY = "drive_text_extractor_history";
+
   // DOM Elements
   const driveForm = document.getElementById("drive-form");
   const driveUrlInput = document.getElementById("drive-url");
@@ -29,7 +32,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnCopy = document.getElementById("btn-copy");
   const copyBtnText = document.getElementById("copy-btn-text");
 
+  // Sidebar History Elements
+  const historyEmpty = document.getElementById("history-empty");
+  const historyList = document.getElementById("history-list");
+  const historyCounter = document.getElementById("history-counter");
+  const btnClearHistory = document.getElementById("btn-clear-history");
+
   let currentlyExtracting = false;
+  let activeHistoryId = null;
 
   // Icons for files (Inline SVG)
   const SVG_PDF = `
@@ -217,6 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       displayExtractionResult(data);
+      saveToHistory(data);
     } catch (err) {
       showAlert(err.message, "danger");
     } finally {
@@ -231,6 +242,7 @@ document.addEventListener("DOMContentLoaded", () => {
    * Display extraction results in the preview section.
    */
   function displayExtractionResult(data) {
+    activeHistoryId = data.file_id;
     resultFilename.textContent = data.file_name;
 
     // Render extraction method badge
@@ -255,6 +267,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     resultSection.classList.remove("hidden");
     resultSection.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    // Update active highlight in sidebar
+    highlightActiveHistoryCard();
   }
 
   /**
@@ -293,12 +308,148 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // --- Left Sidebar Session History Management ---
+
   /**
-   * Escape HTML utility to prevent XSS from file names.
+   * Load extraction history from localStorage.
+   */
+  function getHistory() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Save a newly completed extraction item into localStorage and update the sidebar.
+   */
+  function saveToHistory(data) {
+    let history = getHistory();
+
+    const historyItem = {
+      file_id: data.file_id,
+      file_name: data.file_name,
+      text: data.text,
+      method: data.method,
+      page_count: data.page_count,
+      character_count: data.character_count,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    // Remove older duplicate if same file_id was previously extracted
+    history = history.filter((item) => item.file_id !== data.file_id);
+
+    // Prepend latest extraction to the top
+    history.unshift(historyItem);
+
+    // Keep history lean (maximum 20 items)
+    if (history.length > 20) {
+      history = history.slice(0, 20);
+    }
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    } catch (e) {
+      // Storage quota safety
+    }
+
+    activeHistoryId = data.file_id;
+    renderHistory();
+  }
+
+  /**
+   * Render the saved extractions in the left sidebar.
+   */
+  function renderHistory() {
+    const history = getHistory();
+
+    if (history.length === 0) {
+      historyEmpty.classList.remove("hidden");
+      historyList.classList.add("hidden");
+      historyCounter.textContent = "0";
+      return;
+    }
+
+    historyEmpty.classList.add("hidden");
+    historyList.classList.remove("hidden");
+    historyCounter.textContent = `${history.length}`;
+
+    const methodLabels = {
+      digital: "Digital PDF",
+      ocr: "Image OCR",
+      ocr_fallback: "Scanned PDF",
+    };
+
+    let html = "";
+    history.forEach((item, index) => {
+      const isPdf = item.file_name.toLowerCase().endsWith(".pdf");
+      const icon = isPdf ? SVG_PDF : SVG_IMAGE;
+      const methodLabel = methodLabels[item.method] || item.method.toUpperCase();
+      const isActive = activeHistoryId === item.file_id ? "active" : "";
+
+      html += `
+        <div class="history-card ${isActive}" data-index="${index}" data-file-id="${escapeHtml(item.file_id)}">
+          <div class="history-card-top">
+            ${icon}
+            <span class="history-card-name" title="${escapeHtml(item.file_name)}">${escapeHtml(item.file_name)}</span>
+          </div>
+          <div class="history-card-bottom">
+            <span class="badge badge-method-${escapeHtml(item.method)}">${escapeHtml(methodLabel)}</span>
+            <span>${escapeHtml(item.timestamp)}</span>
+          </div>
+        </div>`;
+    });
+
+    historyList.innerHTML = html;
+
+    // Attach click handlers to each history card in the sidebar
+    const historyCards = historyList.querySelectorAll(".history-card");
+    historyCards.forEach((card) => {
+      card.addEventListener("click", () => {
+        const itemIndex = parseInt(card.dataset.index, 10);
+        const selectedItem = history[itemIndex];
+        if (selectedItem) {
+          displayExtractionResult(selectedItem);
+        }
+      });
+    });
+  }
+
+  /**
+   * Highlight the currently viewed item in the left sidebar.
+   */
+  function highlightActiveHistoryCard() {
+    const historyCards = historyList.querySelectorAll(".history-card");
+    historyCards.forEach((card) => {
+      if (card.dataset.fileId === activeHistoryId) {
+        card.classList.add("active");
+      } else {
+        card.classList.remove("active");
+      }
+    });
+  }
+
+  /**
+   * Clear all stored history.
+   */
+  btnClearHistory.addEventListener("click", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    activeHistoryId = null;
+    renderHistory();
+  });
+
+  /**
+   * Escape HTML utility to prevent XSS.
    */
   function escapeHtml(string) {
+    if (!string) return "";
     const div = document.createElement("div");
     div.innerText = string;
     return div.innerHTML;
   }
+
+  // Initial load: render any previous extractions saved in this browser
+  renderHistory();
 });
