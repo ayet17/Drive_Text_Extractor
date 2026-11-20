@@ -490,6 +490,13 @@ h1 {
   color: var(--text-muted);
 }
 
+.result-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
 /* Result Preview Area */
 .meta-row {
   display: flex;

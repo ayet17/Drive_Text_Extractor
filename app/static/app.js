@@ -31,6 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const extractedTextContent = document.getElementById("extracted-text-content");
   const btnCopy = document.getElementById("btn-copy");
   const copyBtnText = document.getElementById("copy-btn-text");
+  const btnDownload = document.getElementById("btn-download");
+  const downloadBtnText = document.getElementById("download-btn-text");
 
   // Sidebar History Elements
   const historyEmpty = document.getElementById("history-empty");
@@ -305,6 +307,45 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 2000);
     } catch (err) {
       showAlert("Failed to copy text to clipboard.", "danger");
+    }
+  });
+
+  /**
+   * Download extracted text as a local .txt file.
+   */
+  btnDownload.addEventListener("click", () => {
+    const textToDownload = extractedTextContent.textContent;
+    if (!textToDownload || textToDownload === "[No readable text found in document]") {
+      return;
+    }
+
+    // Determine filename: strip original extension and append _extracted.txt
+    const baseName = (resultFilename.textContent || "document").replace(/\.[^/.]+$/, "") || "document";
+    const downloadFileName = `${baseName}_extracted.txt`;
+
+    try {
+      const blob = new Blob([textToDownload], { type: "text/plain;charset=utf-8" });
+      const downloadUrl = URL.createObjectURL(blob);
+      const tempLink = document.createElement("a");
+      tempLink.href = downloadUrl;
+      tempLink.download = downloadFileName;
+      document.body.appendChild(tempLink);
+      tempLink.click();
+      document.body.removeChild(tempLink);
+      URL.revokeObjectURL(downloadUrl);
+
+      // Temporary visual confirmation
+      downloadBtnText.textContent = "Downloaded!";
+      btnDownload.classList.add("btn-primary");
+      btnDownload.classList.remove("btn-secondary");
+
+      setTimeout(() => {
+        downloadBtnText.textContent = "Download";
+        btnDownload.classList.remove("btn-primary");
+        btnDownload.classList.add("btn-secondary");
+      }, 2000);
+    } catch (err) {
+      showAlert("Failed to download text file.", "danger");
     }
   });
 

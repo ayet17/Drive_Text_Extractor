@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Drive Text Extractor</title>
-  <!-- Cache busting query parameter ensures browser loads latest CSS and JS -->
-  <link rel="stylesheet" href="/static/style.css?v=3.0">
+  <link rel="stylesheet" href="/static/style.css?v=3.1">
 </head>
 <body>
   <div class="app-layout">
@@ -107,13 +106,23 @@
               <span id="meta-chars" class="meta-item">Characters: -</span>
             </div>
           </div>
-          <button id="btn-copy" class="btn btn-secondary">
-            <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            <span id="copy-btn-text">Copy Text</span>
-          </button>
+          <div class="result-actions">
+            <button id="btn-copy" class="btn btn-secondary">
+              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span id="copy-btn-text">Copy Text</span>
+            </button>
+            <button id="btn-download" class="btn btn-secondary" title="Download text as .txt file">
+              <svg class="btn-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span id="download-btn-text">Download</span>
+            </button>
+          </div>
         </div>
         <div class="preview-wrapper">
           <pre><code id="extracted-text-content"></code></pre>
@@ -122,6 +131,6 @@
     </main>
   </div>
 
-  <script src="/static/app.js?v=3.0"></script>
+  <script src="/static/app.js?v=3.1"></script>
 </body>
 </html>
