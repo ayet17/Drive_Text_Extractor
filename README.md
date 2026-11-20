@@ -2,7 +2,6 @@
 
 A clean, lightweight Proof-of-Concept (POC) web application that inspects public Google Drive folders, lists documents and images, and extracts their textual content using native PDF parsing and Optical Character Recognition (OCR).
 
-Built for the Junior Software Engineer Technical Assessment (TA-2026-01).
 
 ---
 
@@ -139,6 +138,7 @@ Interactive OpenAPI documentation is available at [http://localhost:8000/docs](h
 2. Click **Inspect Folder**. The application fetches metadata and displays all detected PDFs and images with file type badges.
 3. Click **Extract** next to any file. The server will download the file into a temporary sandbox, parse its text, and return the result.
 4. Review the extracted text in the preview pane, check the extraction method (`Digital PDF`, `Image OCR`, or `Scanned PDF (OCR)`), and click **Copy Text** to copy to your clipboard.
+5. arabic text extraction is not supported yet
 
 ---
 
@@ -170,10 +170,10 @@ The test suite covers:
 
 ## Future Improvements
 
-- **Asynchronous Task Queue**: Offload extraction of multi-page PDFs to background workers (e.g., Celery or ARQ) with WebSocket progress updates.
+- **Table & Layout Preservation**: Integrate layout-aware extraction to preserve tabular data in financial documents and forms.
+- **arabic language to be added in the extraction 
 - **Result Caching**: Cache extracted text by file hash / ID in Redis to avoid re-downloading unchanged documents.
 - **Batch Export**: Provide a "Download All as ZIP" option to export extracted `.txt` files for every document in the folder.
-- **Table & Layout Preservation**: Integrate layout-aware extraction to preserve tabular data in financial documents and forms.
 
 ---
 
